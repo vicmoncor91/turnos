@@ -1,0 +1,59 @@
+// ... (dentro de la etiqueta <script> de tu index.html)
+
+async function cargarTurnos() {
+    grid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-10">Buscando registros...</p>';
+    
+    // Consulta a Supabase usando la fecha del calendario
+    const { data, error } = await supabase
+        .from('historial_relevos')
+        .select('*')
+        .eq('fecha', inputFecha.value); // El campo 'fecha' se queda igual
+
+    if (error) {
+        grid.innerHTML = `<p class="text-red-500 text-center">Error de conexión: ${error.message}</p>`;
+        return;
+    }
+
+    renderizarTarjetas(data);
+}
+
+function renderizarTarjetas(datos) {
+    // Listado exacto de tus 10 puestos
+    const puestos = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "Sierra 7", "P1.7", "P2", "Sierra 8"];
+    
+    grid.innerHTML = '';
+
+    puestos.forEach(puesto => {
+        // Buscamos el registro donde 'nombresierra' coincida (ahora sin guion)
+        const registro = datos.find(d => d.nombresierra === puesto);
+        
+        const card = document.createElement('div');
+        // Diseño: Verde si hay alguien, Gris si está vacío
+        card.className = `p-4 rounded-xl shadow-sm border-l-4 transition-all ${registro ? 'bg-white border-green-500' : 'bg-gray-50 border-gray-300 opacity-60'}`;
+        
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <h2 class="font-bold text-slate-700">${puesto}</h2>
+                <span class="text-[10px] uppercase font-bold px-2 py-1 rounded ${registro ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}">
+                    ${registro ? 'En Turno' : 'Vacante'}
+                </span>
+            </div>
+            <div class="mt-3">
+                <p class="text-lg text-slate-900 font-semibold leading-tight">
+                    ${registro ? registro.nombreoficial : 'Sin asignar'}
+                </p>
+                <div class="flex flex-col mt-2 text-xs text-slate-500 gap-1">
+                    <div class="flex items-center gap-1">
+                        <span class="font-medium text-slate-400">Entrada:</span> 
+                        ${registro?.horaentrada || '--:--'}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="font-medium text-slate-400">Salida:</span> 
+                        ${registro?.horasalida || 'En curso'}
+                    </div>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
