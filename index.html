@@ -6,15 +6,13 @@
     <title>Panel de Turnos | srvictor.com</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1e293b">
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
 
     <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold italic">V</div>
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold italic text-white">V</div>
                 <span class="font-bold tracking-tight">srvictor.com</span>
             </div>
             <input type="date" id="fechaFiltro" 
@@ -23,16 +21,9 @@
     </nav>
 
     <main class="max-w-6xl mx-auto p-4 sm:p-6">
-        <div class="mb-6 flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Estado de Sierras</h1>
-                <p id="statusText" class="text-slate-500 text-xs mt-1 font-mono uppercase italic">Iniciando...</p>
-            </div>
-            <button onclick="cargarDatos()" class="p-2 bg-white rounded-full shadow-sm border border-slate-200 hover:bg-slate-50 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-            </button>
+        <div class="mb-6">
+            <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Estado de Sierras</h1>
+            <p id="statusText" class="text-slate-500 text-xs mt-1 font-mono uppercase italic tracking-tighter">Sincronizando...</p>
         </div>
 
         <div id="gridSierras" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -40,7 +31,6 @@
     </main>
 
     <script>
-        // CONFIGURACIÓN OFICIAL
         const SUPABASE_URL = 'https://eciqadbqzwpwxibbcggz.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjaXFhZGJxendwd3hpYmJjZ2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTI1MTgsImV4cCI6MjA4OTU2ODUxOH0.PcXy8YlpktbJXKmL0jt0U9cjrH2TlIPuS7GK263Xio4';
         
@@ -48,35 +38,36 @@
         const inputFecha = document.getElementById('fechaFiltro');
         const statusText = document.getElementById('statusText');
         
-        const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "Sierra 7", "P1.7", "P2", "Sierra 8"];
+        // LISTA ACTUALIZADA DE PUESTOS
+        const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "7P1", "7P2", "Sierra 8"];
         
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Hoy por defecto
-        inputFecha.value = new Date().toISOString().split('T')[0];
+        // Fecha local de hoy
+        const hoy = new Date();
+        inputFecha.value = hoy.toISOString().split('T')[0];
 
         async function cargarDatos() {
-            statusText.innerText = "Sincronizando...";
+            statusText.innerText = "Actualizando datos...";
             
             try {
-                // Convertir fecha de 2026-03-20 a 20/03/2026 para que coincida con tu DB
+                // Conversión de fecha para tu base de datos (DD/MM/YYYY)
                 const [y, m, d] = inputFecha.value.split('-');
-                const fechaFormateada = `${d}/${m}/${y}`;
+                const fechaDB = `${d}/${m}/${y}`;
 
                 const { data, error } = await supabaseClient
                     .from('historial_relevos')
                     .select('*')
-                    .eq('fecha', fechaFormateada);
+                    .eq('fecha', fechaDB);
 
                 if (error) throw error;
 
-                console.log("Datos para " + fechaFormateada + ":", data);
                 renderizar(data || []);
-                statusText.innerText = `OK - ${fechaFormateada} (${new Date().toLocaleTimeString()})`;
+                statusText.innerText = `Línea activa: ${fechaDB} (${new Date().toLocaleTimeString()})`;
 
             } catch (err) {
                 console.error(err);
-                statusText.innerHTML = `<span class="text-red-500 font-bold tracking-normal italic">Error: ${err.message}</span>`;
+                statusText.innerHTML = `<span class="text-red-500 font-bold">Error de Red</span>`;
             }
         }
 
@@ -84,12 +75,12 @@
             grid.innerHTML = '';
             
             PUESTOS.forEach(puesto => {
-                // Buscamos el registro limpiando espacios en blanco (ej: "Juan ")
+                // Buscamos coincidencia exacta ignorando espacios extras
                 const reg = lista.find(d => d.nombresierra.trim() === puesto);
                 
                 const card = document.createElement('div');
                 card.className = `relative rounded-2xl p-5 border transition-all duration-300 ${
-                    reg ? 'bg-white border-green-200 shadow-md ring-1 ring-green-50' : 'bg-slate-100 border-slate-200 opacity-60'
+                    reg ? 'bg-white border-green-200 shadow-md scale-[1.02]' : 'bg-slate-100 border-slate-200 opacity-60'
                 }`;
 
                 card.innerHTML = `
@@ -99,16 +90,16 @@
                     </div>
                     
                     <h2 class="text-lg font-black text-slate-800 truncate">
-                        ${reg ? reg.nombreoficial.trim() : 'LIBRE'}
+                        ${reg ? reg.nombreoficial.trim() : 'DISPONIBLE'}
                     </h2>
                     
                     <div class="mt-4 space-y-2 text-[11px]">
                         <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
-                            <span class="text-slate-400 font-bold uppercase tracking-tighter">Entrada</span>
+                            <span class="text-slate-400 font-bold uppercase italic">Entrada</span>
                             <span class="text-slate-700 font-black">${reg?.horaentrada || '--:--'}</span>
                         </div>
                         <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
-                            <span class="text-slate-400 font-bold uppercase tracking-tighter">Salida</span>
+                            <span class="text-slate-400 font-bold uppercase italic">Salida</span>
                             <span class="text-slate-700 font-black">${reg?.horasalida || 'En curso'}</span>
                         </div>
                     </div>
@@ -120,6 +111,9 @@
 
         inputFecha.addEventListener('change', cargarDatos);
         window.onload = cargarDatos;
+
+        // Auto-refresco cada 2 minutos para no agotar la cuota de Supabase
+        setInterval(cargarDatos, 120000);
     </script>
 </body>
 </html>
