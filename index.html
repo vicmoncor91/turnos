@@ -14,7 +14,7 @@
     <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold italic">V</div>
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold">V</div>
                 <span class="font-bold tracking-tight">srvictor.com</span>
             </div>
             <input type="date" id="fechaFiltro" 
@@ -25,64 +25,80 @@
     <main class="max-w-6xl mx-auto p-4 sm:p-6">
         <div class="mb-6">
             <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Estado de Sierras</h1>
-            <p id="statusText" class="text-slate-500 text-xs mt-1 font-medium">Sincronizando datos...</p>
+            <p id="statusText" class="text-slate-500 text-xs mt-1 font-medium">Iniciando sistema...</p>
         </div>
 
         <div id="gridSierras" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div class="col-span-full py-20 text-center">
-                <div class="inline-block animate-bounce text-slate-300 font-bold text-4xl">...</div>
             </div>
-        </div>
     </main>
 
     <script>
-        // === CONFIGURACIÓN ===
+        // === 1. CONFIGURACIÓN (REEMPLAZA ESTO) ===
         const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co'; 
         const SUPABASE_KEY = 'TU_ANON_KEY';
-        
-        // Inicialización corregida para que funcione en consola como "supabase"
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // === 2. VARIABLES GLOBALES ===
         const grid = document.getElementById('gridSierras');
         const inputFecha = document.getElementById('fechaFiltro');
         const statusText = document.getElementById('statusText');
-
-        // Lista exacta de puestos (Asegúrate que en la DB se guarden así)
         const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "Sierra 7", "P1.7", "P2", "Sierra 8"];
+        
+        let _supabase;
 
-        // Fecha de hoy por defecto (Formato YYYY-MM-DD)
+        // Establecer fecha de hoy
         inputFecha.value = new Date().toISOString().split('T')[0];
 
-        async function cargarTurnos() {
-            statusText.innerText = "Buscando registros para " + inputFecha.value + "...";
-            
+        // === 3. INICIALIZACIÓN ===
+        function init() {
             try {
-                const { data, error } = await supabase
+                if (!window.supabase) {
+                    throw new Error("No se pudo cargar la librería de Supabase. Revisa tu conexión.");
+                }
+                
+                // Crear el cliente
+                _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log("Supabase inicializado correctamente.");
+                
+                // Carga inicial
+                cargarDatos();
+            } catch (err) {
+                statusText.innerHTML = `<span class="text-red-500">❌ ${err.message}</span>`;
+            }
+        }
+
+        // === 4. CARGAR DATOS ===
+        async function cargarDatos() {
+            statusText.innerText = "Sincronizando con la base de datos...";
+            grid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-300 animate-pulse">Cargando...</div>';
+
+            try {
+                const { data, error } = await _supabase
                     .from('historial_relevos')
                     .select('*')
                     .eq('fecha', inputFecha.value);
 
                 if (error) throw error;
-                
-                renderizarCards(data);
+
+                renderizar(data || []);
                 statusText.innerText = "Última actualización: " + new Date().toLocaleTimeString();
+
             } catch (err) {
-                console.error(err);
-                statusText.innerText = "Error: No se pudo conectar con Supabase.";
+                console.error("Error de Supabase:", err);
+                statusText.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message || 'Fallo de red'}</span>`;
             }
         }
 
-        function renderizarCards(datos) {
+        // === 5. PINTAR TARJETAS ===
+        function renderizar(lista) {
             grid.innerHTML = '';
-
+            
             PUESTOS.forEach(puesto => {
-                // Buscamos coincidencia exacta en 'nombresierra'
-                const reg = datos.find(d => d.nombresierra === puesto);
+                // Buscamos coincidencia exacta en nombresierra (minúsculas pegadas)
+                const reg = lista.find(d => d.nombresierra === puesto);
                 
                 const card = document.createElement('div');
-                // Estilo dinámico: Verde si está ocupado, Gris si está libre
-                card.className = `relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 ${
-                    reg ? 'bg-white border-green-200 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-70'
+                card.className = `relative rounded-2xl p-5 border transition-all duration-300 ${
+                    reg ? 'bg-white border-green-200 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-60'
                 }`;
 
                 card.innerHTML = `
@@ -97,27 +113,25 @@
                     
                     <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
                         <div class="bg-slate-50 p-2 rounded-lg">
-                            <span class="block text-slate-400 font-medium">Entrada</span>
+                            <span class="block text-slate-400 font-medium italic">Entrada</span>
                             <span class="text-slate-700 font-bold">${reg?.horaentrada || '--:--'}</span>
                         </div>
                         <div class="bg-slate-50 p-2 rounded-lg">
-                            <span class="block text-slate-400 font-medium">Salida</span>
+                            <span class="block text-slate-400 font-medium italic">Salida</span>
                             <span class="text-slate-700 font-bold">${reg?.horasalida || 'En curso'}</span>
                         </div>
                     </div>
-
                     ${reg ? '<div class="absolute bottom-0 left-0 w-full h-1 bg-green-500"></div>' : ''}
                 `;
                 grid.appendChild(card);
             });
         }
 
-        // Eventos
-        inputFecha.addEventListener('change', cargarTurnos);
-        window.addEventListener('load', cargarTurnos);
+        // Escuchar cambios de fecha
+        inputFecha.addEventListener('change', cargarDatos);
 
-        // Auto-refresco cada 5 minutos (opcional)
-        setInterval(cargarTurnos, 300000);
+        // Arrancar cuando cargue la ventana
+        window.onload = init;
     </script>
 </body>
 </html>
