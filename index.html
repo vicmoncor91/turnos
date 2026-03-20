@@ -3,29 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Turnos | srvictor.com</title>
+    <title>Panel de Turnos | srvictor.com</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1e293b">
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
 
     <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold">V</div>
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold italic text-white">V</div>
                 <span class="font-bold tracking-tight">srvictor.com</span>
             </div>
             <input type="date" id="fechaFiltro" 
-                   class="bg-slate-700 border-none rounded-lg px-3 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500">
+                   class="bg-slate-700 border-none rounded-lg px-3 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 text-white">
         </div>
     </nav>
 
     <main class="max-w-6xl mx-auto p-4 sm:p-6">
         <div class="mb-6">
             <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Estado de Sierras</h1>
-            <p id="statusText" class="text-slate-500 text-xs mt-1 font-medium">Iniciando sistema...</p>
+            <p id="statusText" class="text-slate-500 text-xs mt-1 font-medium italic">Sincronizando...</p>
         </div>
 
         <div id="gridSierras" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -33,105 +31,87 @@
     </main>
 
     <script>
-        // === 1. CONFIGURACIÓN (REEMPLAZA ESTO) ===
         const SUPABASE_URL = 'https://eciqadbqzwpwxibbcggz.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjaXFhZGJxendwd3hpYmJjZ2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTI1MTgsImV4cCI6MjA4OTU2ODUxOH0.PcXy8YlpktbJXKmL0jt0U9cjrH2TlIPuS7GK263Xio4';
-
-        // === 2. VARIABLES GLOBALES ===
+        
         const grid = document.getElementById('gridSierras');
         const inputFecha = document.getElementById('fechaFiltro');
         const statusText = document.getElementById('statusText');
+        
         const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "Sierra 7", "P1.7", "P2", "Sierra 8"];
         
-        let _supabase;
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Establecer fecha de hoy
-        inputFecha.value = new Date().toISOString().split('T')[0];
+        // 1. Establecer fecha de hoy en el input (formato YYYY-MM-DD)
+        const hoy = new Date();
+        inputFecha.value = hoy.toISOString().split('T')[0];
 
-        // === 3. INICIALIZACIÓN ===
-        function init() {
-            try {
-                if (!window.supabase) {
-                    throw new Error("No se pudo cargar la librería de Supabase. Revisa tu conexión.");
-                }
-                
-                // Crear el cliente
-                _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                console.log("Supabase inicializado correctamente.");
-                
-                // Carga inicial
-                cargarDatos();
-            } catch (err) {
-                statusText.innerHTML = `<span class="text-red-500">❌ ${err.message}</span>`;
-            }
+        // 2. Función para convertir fecha de YYYY-MM-DD a DD/MM/YYYY
+        function formatearFechaParaDB(fechaISO) {
+            const [year, month, day] = fechaISO.split('-');
+            return `${day}/${month}/${year}`;
         }
 
-        // === 4. CARGAR DATOS ===
         async function cargarDatos() {
-            statusText.innerText = "Sincronizando con la base de datos...";
-            grid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-300 animate-pulse">Cargando...</div>';
-
+            const fechaBusqueda = formatearFechaParaDB(inputFecha.value);
+            statusText.innerText = `Buscando registros para ${fechaBusqueda}...`;
+            
             try {
-                const { data, error } = await _supabase
+                const { data, error } = await supabase
                     .from('historial_relevos')
                     .select('*')
-                    .eq('fecha', inputFecha.value);
+                    .eq('fecha', fechaBusqueda); // Ahora sí coincidirá el formato
 
                 if (error) throw error;
-
                 renderizar(data || []);
                 statusText.innerText = "Última actualización: " + new Date().toLocaleTimeString();
 
             } catch (err) {
-                console.error("Error de Supabase:", err);
-                statusText.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message || 'Fallo de red'}</span>`;
+                console.error(err);
+                statusText.innerHTML = `<span class="text-red-500">Error: ${err.message}</span>`;
             }
         }
 
-        // === 5. PINTAR TARJETAS ===
         function renderizar(lista) {
             grid.innerHTML = '';
             
             PUESTOS.forEach(puesto => {
-                // Buscamos coincidencia exacta en nombresierra (minúsculas pegadas)
+                // Buscamos coincidencia exacta de nombre de sierra
                 const reg = lista.find(d => d.nombresierra === puesto);
                 
                 const card = document.createElement('div');
                 card.className = `relative rounded-2xl p-5 border transition-all duration-300 ${
-                    reg ? 'bg-white border-green-200 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-60'
+                    reg ? 'bg-white border-green-200 shadow-md' : 'bg-slate-100 border-slate-200 opacity-60'
                 }`;
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-3">
                         <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">${puesto}</span>
-                        <div class="h-2 w-2 rounded-full ${reg ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}"></div>
+                        <div class="h-2.5 w-2.5 rounded-full ${reg ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}"></div>
                     </div>
                     
-                    <h2 class="text-lg font-bold text-slate-800 truncate">
-                        ${reg ? reg.nombreoficial : 'VACANTE'}
+                    <h2 class="text-lg font-extrabold text-slate-800 truncate">
+                        ${reg ? reg.nombreoficial.trim() : 'DISPONIBLE'}
                     </h2>
                     
-                    <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
-                        <div class="bg-slate-50 p-2 rounded-lg">
-                            <span class="block text-slate-400 font-medium italic">Entrada</span>
-                            <span class="text-slate-700 font-bold">${reg?.horaentrada || '--:--'}</span>
+                    <div class="mt-4 space-y-2 text-[11px]">
+                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
+                            <span class="text-slate-400 font-bold uppercase italic">Entrada</span>
+                            <span class="text-slate-700 font-black">${reg?.horaentrada || '--:--'}</span>
                         </div>
-                        <div class="bg-slate-50 p-2 rounded-lg">
-                            <span class="block text-slate-400 font-medium italic">Salida</span>
-                            <span class="text-slate-700 font-bold">${reg?.horasalida || 'En curso'}</span>
+                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
+                            <span class="text-slate-400 font-bold uppercase italic">Salida</span>
+                            <span class="text-slate-700 font-black">${reg?.horasalida || 'En curso'}</span>
                         </div>
                     </div>
-                    ${reg ? '<div class="absolute bottom-0 left-0 w-full h-1 bg-green-500"></div>' : ''}
+                    ${reg ? '<div class="absolute bottom-0 left-0 w-full h-1.5 bg-green-500"></div>' : ''}
                 `;
                 grid.appendChild(card);
             });
         }
 
-        // Escuchar cambios de fecha
         inputFecha.addEventListener('change', cargarDatos);
-
-        // Arrancar cuando cargue la ventana
-        window.onload = init;
+        window.onload = cargarDatos;
     </script>
 </body>
 </html>
