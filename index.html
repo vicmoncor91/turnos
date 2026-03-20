@@ -3,117 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Turnos | srvictor.com</title>
+    <title>Panel CDT | srvictor.com</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+<body class="bg-slate-900 min-h-screen font-sans text-slate-200 p-2 sm:p-4">
 
-    <nav class="bg-slate-800 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold italic text-white">V</div>
-                <span class="font-bold tracking-tight">srvictor.com</span>
-            </div>
-            <input type="date" id="fechaFiltro" 
-                   class="bg-slate-700 border-none rounded-lg px-3 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500 text-white">
+    <header class="max-w-4xl mx-auto flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-lg shadow-xl border border-slate-700">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white font-black px-2 py-1 rounded text-xs">CDT</div>
+            <h1 class="text-sm font-bold uppercase tracking-widest text-slate-100">Control de Turnos</h1>
         </div>
-    </nav>
+        <input type="date" id="fechaFiltro" 
+               class="bg-slate-700 border-none rounded px-2 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 text-white">
+    </header>
 
-    <main class="max-w-6xl mx-auto p-4 sm:p-6">
-        <div class="mb-6">
-            <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Estado de Sierras</h1>
-            <p id="statusText" class="text-slate-500 text-xs mt-1 font-mono uppercase italic tracking-tighter">Sincronizando...</p>
+    <main class="max-w-4xl mx-auto">
+        <div class="bg-slate-800 rounded-lg overflow-hidden shadow-2xl border border-slate-700">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-700/50 text-[10px] uppercase tracking-wider text-slate-400">
+                        <th class="px-4 py-3 font-black">Puesto</th>
+                        <th class="px-4 py-3 font-black">Oficial</th>
+                        <th class="px-4 py-3 font-black text-center">Entrada</th>
+                        <th class="px-4 py-3 font-black text-center">Salida</th>
+                        <th class="px-4 py-3 font-black text-right">Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="listaPuestos" class="text-sm">
+                    </tbody>
+            </table>
         </div>
 
-        <div id="gridSierras" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            </div>
+        <footer class="mt-4 flex justify-between items-center px-2">
+            <p id="statusText" class="text-[9px] font-mono uppercase text-slate-500 italic">Sincronizando...</p>
+            <button onclick="cargarDatos()" class="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">
+                Refrescar datos
+            </button>
+        </footer>
     </main>
 
     <script>
         const SUPABASE_URL = 'https://eciqadbqzwpwxibbcggz.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjaXFhZGJxendwd3hpYmJjZ2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTI1MTgsImV4cCI6MjA4OTU2ODUxOH0.PcXy8YlpktbJXKmL0jt0U9cjrH2TlIPuS7GK263Xio4';
         
-        const grid = document.getElementById('gridSierras');
+        const tablaBody = document.getElementById('listaPuestos');
         const inputFecha = document.getElementById('fechaFiltro');
         const statusText = document.getElementById('statusText');
         
-        // LISTA ACTUALIZADA DE PUESTOS
         const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "7P1", "7P2", "Sierra 8"];
         
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        // Fecha local de hoy
-        const hoy = new Date();
-        inputFecha.value = hoy.toISOString().split('T')[0];
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        inputFecha.value = new Date().toISOString().split('T')[0];
 
         async function cargarDatos() {
-            statusText.innerText = "Actualizando datos...";
-            
+            statusText.innerText = "Consultando...";
             try {
-                // Conversión de fecha para tu base de datos (DD/MM/YYYY)
                 const [y, m, d] = inputFecha.value.split('-');
                 const fechaDB = `${d}/${m}/${y}`;
 
-                const { data, error } = await supabaseClient
+                const { data, error } = await supabase
                     .from('historial_relevos')
                     .select('*')
                     .eq('fecha', fechaDB);
 
                 if (error) throw error;
-
-                renderizar(data || []);
-                statusText.innerText = `Línea activa: ${fechaDB} (${new Date().toLocaleTimeString()})`;
-
+                renderizarTabla(data || []);
+                statusText.innerText = `Sincronizado: ${fechaDB} ${new Date().toLocaleTimeString()}`;
             } catch (err) {
-                console.error(err);
-                statusText.innerHTML = `<span class="text-red-500 font-bold">Error de Red</span>`;
+                statusText.innerHTML = `<span class="text-red-400">Error: ${err.message}</span>`;
             }
         }
 
-        function renderizar(lista) {
-            grid.innerHTML = '';
+        function renderizarTabla(lista) {
+            tablaBody.innerHTML = '';
             
             PUESTOS.forEach(puesto => {
-                // Buscamos coincidencia exacta ignorando espacios extras
                 const reg = lista.find(d => d.nombresierra.trim() === puesto);
                 
-                const card = document.createElement('div');
-                card.className = `relative rounded-2xl p-5 border transition-all duration-300 ${
-                    reg ? 'bg-white border-green-200 shadow-md scale-[1.02]' : 'bg-slate-100 border-slate-200 opacity-60'
-                }`;
+                const tr = document.createElement('tr');
+                tr.className = `border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${!reg ? 'opacity-40' : ''}`;
 
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-3">
-                        <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">${puesto}</span>
-                        <div class="h-2.5 w-2.5 rounded-full ${reg ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}"></div>
-                    </div>
-                    
-                    <h2 class="text-lg font-black text-slate-800 truncate">
-                        ${reg ? reg.nombreoficial.trim() : 'DISPONIBLE'}
-                    </h2>
-                    
-                    <div class="mt-4 space-y-2 text-[11px]">
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
-                            <span class="text-slate-400 font-bold uppercase italic">Entrada</span>
-                            <span class="text-slate-700 font-black">${reg?.horaentrada || '--:--'}</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-200">
-                            <span class="text-slate-400 font-bold uppercase italic">Salida</span>
-                            <span class="text-slate-700 font-black">${reg?.horasalida || 'En curso'}</span>
-                        </div>
-                    </div>
-                    ${reg ? '<div class="absolute bottom-0 left-0 w-full h-1.5 bg-green-500 rounded-b-2xl"></div>' : ''}
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-bold text-slate-300 text-xs">${puesto}</td>
+                    <td class="px-4 py-3 font-medium ${reg ? 'text-blue-300' : 'text-slate-500 italic'}">
+                        ${reg ? reg.nombreoficial.trim() : 'Vacante'}
+                    </td>
+                    <td class="px-4 py-3 text-center font-mono text-xs text-slate-400">
+                        ${reg ? reg.horaentrada : '--:--'}
+                    </td>
+                    <td class="px-4 py-3 text-center font-mono text-xs text-slate-400">
+                        ${reg?.horasalida ? reg.horasalida : (reg ? '...' : '--:--')}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="inline-block w-2 h-2 rounded-full ${reg ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-slate-600'}"></span>
+                    </td>
                 `;
-                grid.appendChild(card);
+                tablaBody.appendChild(tr);
             });
         }
 
         inputFecha.addEventListener('change', cargarDatos);
         window.onload = cargarDatos;
-
-        // Auto-refresco cada 2 minutos para no agotar la cuota de Supabase
-        setInterval(cargarDatos, 120000);
+        setInterval(cargarDatos, 60000); // Auto-refresco cada minuto
     </script>
 </body>
 </html>
