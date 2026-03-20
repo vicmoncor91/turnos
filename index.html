@@ -3,31 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel CDT | srvictor.com</title>
+    <title>CDT Panel | srvictor.com</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-900 min-h-screen font-sans text-slate-200 p-2 sm:p-4">
 
-    <header class="max-w-4xl mx-auto flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-lg shadow-xl border border-slate-700">
+    <header class="max-w-4xl mx-auto flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-2xl">
         <div class="flex items-center gap-3">
-            <div class="bg-blue-600 text-white font-black px-2 py-1 rounded text-xs">CDT</div>
-            <h1 class="text-sm font-bold uppercase tracking-widest text-slate-100">Control de Turnos</h1>
+            <div class="bg-blue-600 text-white font-black px-2 py-1 rounded text-[10px]">CDT</div>
+            <h1 class="text-xs font-bold uppercase tracking-widest text-slate-100">Panel de Control</h1>
         </div>
         <input type="date" id="fechaFiltro" 
-               class="bg-slate-700 border-none rounded px-2 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 text-white">
+               class="bg-slate-700 border-none rounded px-2 py-1 text-xs font-bold outline-none text-white focus:ring-1 focus:ring-blue-500">
     </header>
 
     <main class="max-w-4xl mx-auto">
-        <div class="bg-slate-800 rounded-lg overflow-hidden shadow-2xl border border-slate-700">
+        <div class="bg-slate-800 rounded-lg overflow-hidden border border-slate-700 shadow-2xl">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-700/50 text-[10px] uppercase tracking-wider text-slate-400">
-                        <th class="px-4 py-3 font-black">Puesto</th>
-                        <th class="px-4 py-3 font-black">Oficial</th>
-                        <th class="px-4 py-3 font-black text-center">Entrada</th>
-                        <th class="px-4 py-3 font-black text-center">Salida</th>
-                        <th class="px-4 py-3 font-black text-right">Estado</th>
+                        <th class="px-4 py-3">Puesto</th>
+                        <th class="px-4 py-3">Oficial</th>
+                        <th class="px-4 py-3 text-center">Entrada</th>
+                        <th class="px-4 py-3 text-center text-blue-400">Salida</th>
+                        <th class="px-4 py-3 text-right">Estado</th>
                     </tr>
                 </thead>
                 <tbody id="listaPuestos" class="text-sm">
@@ -36,76 +36,94 @@
         </div>
 
         <footer class="mt-4 flex justify-between items-center px-2">
-            <p id="statusText" class="text-[9px] font-mono uppercase text-slate-500 italic">Sincronizando...</p>
-            <button onclick="cargarDatos()" class="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">
-                Refrescar datos
+            <p id="statusText" class="text-[9px] font-mono uppercase text-slate-500 italic font-bold">Iniciando...</p>
+            <button onclick="cargarDatos()" class="text-[10px] font-bold text-blue-400 hover:text-blue-200 uppercase tracking-widest transition-all">
+                Forzar Actualización
             </button>
         </footer>
     </main>
 
     <script>
-        const SUPABASE_URL = 'https://eciqadbqzwpwxibbcggz.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjaXFhZGJxendwd3hpYmJjZ2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTI1MTgsImV4cCI6MjA4OTU2ODUxOH0.PcXy8YlpktbJXKmL0jt0U9cjrH2TlIPuS7GK263Xio4';
-        
-        const tablaBody = document.getElementById('listaPuestos');
-        const inputFecha = document.getElementById('fechaFiltro');
-        const statusText = document.getElementById('statusText');
+        // CONFIGURACIÓN DIRECTA
+        const S_URL = 'https://eciqadbqzwpwxibbcggz.supabase.co'; 
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjaXFhZGJxendwd3hpYmJjZ2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTI1MTgsImV4cCI6MjA4OTU2ODUxOH0.PcXy8YlpktbJXKmL0jt0U9cjrH2TlIPuS7GK263Xio4';
         
         const PUESTOS = ["Sierra 1", "Sierra 2", "Sierra 3", "Sierra 4", "Sierra 5", "Sierra 6", "7P1", "7P2", "Sierra 8"];
         
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        inputFecha.value = new Date().toISOString().split('T')[0];
+        let supabase;
+
+        // 1. Intentar inicializar Supabase con reintentos
+        function initSupabase() {
+            try {
+                if (typeof window.supabase !== 'undefined') {
+                    supabase = window.supabase.createClient(S_URL, S_KEY);
+                    console.log("Supabase OK");
+                    document.getElementById('fechaFiltro').value = new Date().toISOString().split('T')[0];
+                    cargarDatos();
+                } else {
+                    setTimeout(initSupabase, 500); // Reintenta en medio segundo si la librería no cargó
+                }
+            } catch (err) {
+                document.getElementById('statusText').innerText = "Error de inicio: " + err.message;
+            }
+        }
 
         async function cargarDatos() {
-            statusText.innerText = "Consultando...";
+            const status = document.getElementById('statusText');
+            const fechaInput = document.getElementById('fechaFiltro').value;
+            status.innerText = "Sincronizando...";
+            
             try {
-                const [y, m, d] = inputFecha.value.split('-');
-                const fechaDB = `${d}/${m}/${y}`;
+                // Formato DD/MM/YYYY
+                const [y, m, d] = fechaInput.split('-');
+                const fechaBusqueda = `${d}/${m}/${y}`;
 
                 const { data, error } = await supabase
                     .from('historial_relevos')
                     .select('*')
-                    .eq('fecha', fechaDB);
+                    .eq('fecha', fechaBusqueda);
 
                 if (error) throw error;
-                renderizarTabla(data || []);
-                statusText.innerText = `Sincronizado: ${fechaDB} ${new Date().toLocaleTimeString()}`;
+                
+                renderizar(data || []);
+                status.innerText = `Línea: ${fechaBusqueda} - ${new Date().toLocaleTimeString()}`;
             } catch (err) {
-                statusText.innerHTML = `<span class="text-red-400">Error: ${err.message}</span>`;
+                console.error(err);
+                status.innerText = "Error: " + err.message;
             }
         }
 
-        function renderizarTabla(lista) {
-            tablaBody.innerHTML = '';
+        function renderizar(lista) {
+            const tbody = document.getElementById('listaPuestos');
+            tbody.innerHTML = '';
             
             PUESTOS.forEach(puesto => {
                 const reg = lista.find(d => d.nombresierra.trim() === puesto);
-                
                 const tr = document.createElement('tr');
-                tr.className = `border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors ${!reg ? 'opacity-40' : ''}`;
+                tr.className = `border-b border-slate-700/50 hover:bg-slate-700/20 transition-all ${!reg ? 'opacity-30' : ''}`;
 
                 tr.innerHTML = `
                     <td class="px-4 py-3 font-bold text-slate-300 text-xs">${puesto}</td>
-                    <td class="px-4 py-3 font-medium ${reg ? 'text-blue-300' : 'text-slate-500 italic'}">
-                        ${reg ? reg.nombreoficial.trim() : 'Vacante'}
+                    <td class="px-4 py-3 font-medium ${reg ? 'text-blue-300' : 'text-slate-500'}">
+                        ${reg ? reg.nombreoficial.trim() : '---'}
                     </td>
-                    <td class="px-4 py-3 text-center font-mono text-xs text-slate-400">
+                    <td class="px-4 py-3 text-center font-mono text-[11px] text-slate-400">
                         ${reg ? reg.horaentrada : '--:--'}
                     </td>
-                    <td class="px-4 py-3 text-center font-mono text-xs text-slate-400">
+                    <td class="px-4 py-3 text-center font-mono text-[11px] text-blue-400/80">
                         ${reg?.horasalida ? reg.horasalida : (reg ? '...' : '--:--')}
                     </td>
                     <td class="px-4 py-3 text-right">
-                        <span class="inline-block w-2 h-2 rounded-full ${reg ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-slate-600'}"></span>
+                        <div class="inline-block w-2 h-2 rounded-full ${reg ? 'bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse' : 'bg-slate-600'}"></div>
                     </td>
                 `;
-                tablaBody.appendChild(tr);
+                tbody.appendChild(tr);
             });
         }
 
-        inputFecha.addEventListener('change', cargarDatos);
-        window.onload = cargarDatos;
-        setInterval(cargarDatos, 60000); // Auto-refresco cada minuto
+        // Eventos
+        document.getElementById('fechaFiltro').addEventListener('change', cargarDatos);
+        window.onload = initSupabase;
     </script>
 </body>
 </html>
